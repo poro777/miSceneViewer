@@ -9,6 +9,9 @@ Simple mitsube viewer in pygame.
 
 ![](/images/miViewer.png)
 
+## Requirements
+Install PyTorch(cuda), [FLIP](https://github.com/NVlabs/flip)(If you want to use) and packages in requiremetns.txt
+
 ## Run
 `python ./main.py`
 
