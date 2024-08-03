@@ -23,8 +23,13 @@ class mitsuba_scene(Scene):
         # use first camera
         if len(self.sensors) > 0:
             self.camera = self.sensors[0]
-            self.camera_to_world = self.params[f'{self.sensors[0]}.to_world']
-        
+            if f'{self.sensors[0]}.to_world' in self.params:
+                self.camera_to_world = self.params[f'{self.sensors[0]}.to_world']
+            elif 'PerspectiveCamera.to_world' in self.params:
+                self.camera_to_world = self.params['PerspectiveCamera.to_world']
+            else:
+                print(f"Cannot load default sensor {self.camera} in file")
+
         self.time = 0
         for name, animation in self.animation.items():
             self.time = max(self.time, animation.endTiem)
