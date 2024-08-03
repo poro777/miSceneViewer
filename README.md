@@ -1,4 +1,5 @@
-# Mitsube scene viewer
+# Mitsube Scene Viewer and Generator(from blender)
+# Mitsube Scene Viewer
 Simple mitsube viewer in pygame.
 - Integraor parameter control (SPP、depth...)
 - Progress output (average output images)
