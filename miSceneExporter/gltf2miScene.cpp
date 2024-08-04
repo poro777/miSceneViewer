@@ -165,7 +165,7 @@ bool saveDocument(tinyxml2::XMLDocument& doc, std::string filePath) {
     export all mesh to .obj file
 */
 void exportObj(fs::path& outputFolder, fs::path& meshesFolder, aiScene* scene,
-    aiNode* node, aiMatrix4x4& parentMatrix, std::vector<bool>& exportedMesh, std::vector<Shape>& shapes) {
+    aiNode* node, aiMatrix4x4& parentMatrix, std::set<std::string>& exportedMesh, std::vector<Shape>& shapes) {
 
     aiMatrix4x4 transformMatrix = parentMatrix * node->mTransformation;
     aiNode* newNode = new aiNode;
@@ -185,21 +185,29 @@ void exportObj(fs::path& outputFolder, fs::path& meshesFolder, aiScene* scene,
 
         auto indexOfMesh = node->mMeshes[i];
         auto mesh = scene->mMeshes[indexOfMesh];
-            
-        std::string relativeFilePath = fmt::format("{}/{}.obj", meshesFolder.string(), mesh->mName.C_Str());
+        const char* meshName = mesh->mName.C_Str();
+        std::string relativeFilePath = fmt::format("{}/{}.obj", meshesFolder.string(), meshName);
 
-        if (exportedMesh[indexOfMesh] == false) {
+        if (isInSet(exportedMesh, meshName) == false) {
             newNode->mMeshes[0] = node->mMeshes[i];
 
             // export mesh in local coordinate
             Assimp::Exporter exporter;
             if (exporter.Export(scene, "objnomtl", (outputFolder / relativeFilePath).string()) == AI_SUCCESS) {
-                fmt::println("Export mesh to {}", relativeFilePath);
+                fmt::println("Shape {} export mesh to {}", shapeId.c_str(), relativeFilePath);
             }
             else {
                 fmt::println("Error exporting: {}", exporter.GetErrorString());
             }
-            exportedMesh[indexOfMesh] = true;
+            exportedMesh.insert(meshName);
+        }
+        else{
+            static bool messagePrinted = false;
+            if (messagePrinted == false) {
+                fmt::println("[Warning] Find meshes with the same name, the shape will share the same mesh.");
+                messagePrinted = true;
+            }
+            fmt::println("Shape {} use duplicate mesh {}", shapeId.c_str(), relativeFilePath);
         }
         shapes.push_back(Shape(shapeId, relativeFilePath, node, mesh, transformMatrix));
     }
@@ -228,7 +236,7 @@ void exportSceneMeshes(fs::path& outputFolder, fs::path& meshesFolder, const aiS
 
     // export obj with mutable scene
     aiMatrix4x4 matrix;
-    std::vector<bool> alreadyExport(scene->mNumMeshes, false);
+    std::set<std::string> alreadyExport;
     exportObj(outputFolder, meshesFolder, newScene, scene->mRootNode, matrix, alreadyExport, shapes);
 
     newScene->mRootNode = nullptr;
@@ -272,7 +280,7 @@ void miSensor(tinyxml2::XMLDocument& doc, tinyxml2::XMLElement* docRoot,
          </sensor>
       */
     docRoot->InsertEndChild(createComment(doc, "Camera"));
-    for (int i = 0; i < pScene->mNumCameras;i++) {
+    for (int i = 0; i < pScene->mNumCameras; i++) {
         auto camera = pScene->mCameras[i];
         auto cameraNode = pScene->mRootNode->FindNode(camera->mName);
         cameras.insert(camera->mName.C_Str());
