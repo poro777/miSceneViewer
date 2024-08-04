@@ -50,7 +50,7 @@ gltf file can be exported from blender (.gltf + .bin + textures)
 - Install dependency `assimp`, `fmt` and `tinyxml2` which can be installed via `vcpkg`.
 - Complie the file `miSceneExporter/gltf2miScene.cpp` using c++17.
 - Run `gltf2miScene.exe path_to_gltf_file.gltf`.
-- The result are in `output/` next to gltf file.
+- The results are located in `output/` under the current folder.
 ```
 output
 |- textures
