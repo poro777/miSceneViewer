@@ -46,6 +46,8 @@ gltf file can be exported from blender (.gltf + .bin + textures)
     Can animate to camera
 
 ![](./images/blender.png)
+## Examples
+Some sample scenes can be found [here](./scene/)
 ## Run
 - Install dependency `assimp`, `fmt` and `tinyxml2` which can be installed via `vcpkg`.
 - Complie the file `miSceneExporter/gltf2miScene.cpp` using c++17.
