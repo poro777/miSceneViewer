@@ -1,0 +1,186 @@
+<scene version="3.0.0">
+    <!--	Integrator	-->
+    <integrator type="path">
+        <integer name="max_depth" value="8"/>
+    </integrator>
+    <!--	Camera	-->
+    <sensor type="perspective" id="c_Camera">
+        <transform name="to_world">
+            <matrix value="-0.49839294 -0.13465074 -0.85643077 13.948181 -0.0625153 0.9908751 -0.11940822 5.4907393 0.86469436 -0.005972177 -0.5022629 13.052786 0 0 0 1"/>
+        </transform>
+    </sensor>
+    <!--	Shapes	-->
+    <shape type="obj" id="s_FloorPlane">
+        <string name="filename" value="models/Cube.001.obj"/>
+        <transform name="to_world">
+            <matrix value="9.980707 0 0 -1 0 1 0 -1 0 0 9.653714 0 0 0 0 1"/>
+        </transform>
+        <ref name="bsdf" id="m_Floor"/>
+    </shape>
+    <shape type="obj" id="s_animatableCube_0">
+        <string name="filename" value="models/Cube.004-0.obj"/>
+        <transform name="to_world">
+            <matrix value="1 0 0 -3.3661299 0 1 0 1.0638847 0 0 1 -6.9538593 0 0 0 1"/>
+        </transform>
+        <ref name="bsdf" id="m_Material.003"/>
+    </shape>
+    <shape type="obj" id="s_animatableCube_1">
+        <string name="filename" value="models/Cube.004-1.obj"/>
+        <transform name="to_world">
+            <matrix value="1 0 0 -3.3661299 0 1 0 1.0638847 0 0 1 -6.9538593 0 0 0 1"/>
+        </transform>
+        <ref name="bsdf" id="m_Textured"/>
+    </shape>
+    <shape type="obj" id="s_mediumCube">
+        <string name="filename" value="models/Cube.005.obj"/>
+        <transform name="to_world">
+            <matrix value="0.4 0 0 -3.3661299 0 0.4 0 2.4539385 0 0 0.4 -6.9538593 0 0 0 1"/>
+        </transform>
+        <ref name="bsdf" id="m_Material.003"/>
+    </shape>
+    <shape type="obj" id="s_smallCube">
+        <string name="filename" value="models/Cube.005.obj"/>
+        <transform name="to_world">
+            <matrix value="0.2 0 0 -3.3661299 0 0.2 0 3.0593963 0 0 0.2 -6.9538593 0 0 0 1"/>
+        </transform>
+        <ref name="bsdf" id="m_Material.003"/>
+    </shape>
+    <shape type="obj" id="s_FloorPlane.001">
+        <string name="filename" value="models/Cube.001.obj"/>
+        <transform name="to_world">
+            <matrix value="0.45132893 0 0 6.528813 0 1 0 0.591295 0 0 9.653714 -0.124602795 0 0 0 1"/>
+        </transform>
+        <ref name="bsdf" id="m_Floor"/>
+    </shape>
+    <shape type="obj" id="s_glassCube">
+        <string name="filename" value="models/Cube.007.obj"/>
+        <transform name="to_world">
+            <matrix value="1 0 0 3.4692657 0 1 0 1.0638846 0 0 1 -2.1489806 0 0 0 1"/>
+        </transform>
+        <ref name="bsdf" id="m_Glass"/>
+    </shape>
+    <shape type="obj" id="s_mirrorCube">
+        <string name="filename" value="models/Cube.008.obj"/>
+        <transform name="to_world">
+            <matrix value="1 0 0 3.4692657 0 1 0 1.0638846 0 0 1 2.9244769 0 0 0 1"/>
+        </transform>
+        <ref name="bsdf" id="m_Mirror"/>
+    </shape>
+    <shape type="obj" id="s_cube">
+        <string name="filename" value="models/Cube.005.obj"/>
+        <transform name="to_world">
+            <matrix value="1 0 0 3.4692657 0 1 0 1.0638846 0 0 1 7.4618435 0 0 0 1"/>
+        </transform>
+        <ref name="bsdf" id="m_Material.003"/>
+    </shape>
+    <shape type="obj" id="s_textureCube">
+        <string name="filename" value="models/Cube.010.obj"/>
+        <transform name="to_world">
+            <matrix value="1 0 0 3.4692657 0 1 0 1.0638846 0 0 1 -6.9304924 0 0 0 1"/>
+        </transform>
+        <ref name="bsdf" id="m_Textured"/>
+    </shape>
+    <shape type="obj" id="s_mirrorTeapot">
+        <string name="filename" value="models/teapot.obj"/>
+        <transform name="to_world">
+            <matrix value="0.41153836 0.28396508 2.9802322e-08 6.4714394 0 2.9802322e-08 -0.5 1.6171027 -0.28396508 0.41153836 2.9802322e-08 2.919222 0 0 0 1"/>
+        </transform>
+        <ref name="bsdf" id="m_Mirror"/>
+    </shape>
+    <shape type="obj" id="s_teapot">
+        <string name="filename" value="models/teapot.obj"/>
+        <transform name="to_world">
+            <matrix value="0.38131297 0.32341987 1.4901161e-08 6.4714394 1.4901161e-08 0 -0.5 1.6171027 -0.32341987 0.38131297 0 7.452307 0 0 0 1"/>
+        </transform>
+        <ref name="bsdf" id="m_Material.003"/>
+    </shape>
+    <shape type="obj" id="s_glassTeapot">
+        <string name="filename" value="models/teapot.obj"/>
+        <transform name="to_world">
+            <matrix value="0.42007232 0.2711812 2.9802322e-08 6.4714394 0 5.9604645e-08 -0.49999997 1.6171027 -0.2711812 0.4200723 5.9604645e-08 -2.2743015 0 0 0 1"/>
+        </transform>
+        <ref name="bsdf" id="m_Glass2"/>
+    </shape>
+    <shape type="obj" id="s_textureTeapot">
+        <string name="filename" value="models/teapot.obj"/>
+        <transform name="to_world">
+            <matrix value="0.4505407 0.21682501 2.9802322e-08 6.4714394 -7.450581e-09 1.1920929e-07 -0.5 1.6171027 -0.21682501 0.45054066 8.940697e-08 -6.994836 0 0 0 1"/>
+        </transform>
+        <ref name="bsdf" id="m_Textured"/>
+    </shape>
+    <!--	Emitters	-->
+    <shape type="obj" id="s_LightPlane">
+        <string name="filename" value="models/Mesh.002.obj"/>
+        <transform name="to_world">
+            <matrix value="0.3686915 -0.34448418 0.50278383 1.9799588 0.030657642 -0.77387184 -0.3654332 9.648613 0.48942938 0.307978 -0.35586107 -3.7125669 0 0 0 1"/>
+        </transform>
+        <ref name="bsdf" id="m_Emissive.003"/>
+        <emitter type="area">
+            <rgb name="radiance" value="500 347.5498 365.07678"/>
+        </emitter>
+    </shape>
+    <shape type="obj" id="s_LightPlane.001">
+        <string name="filename" value="models/Mesh.002.obj"/>
+        <transform name="to_world">
+            <matrix value="-0.35237563 0.3529729 -0.5111707 -5.814682 0.030449074 -0.77380174 -0.36442292 9.648613 -0.4962011 -0.2981463 0.34064332 3.5904243 0 0 0 1"/>
+        </transform>
+        <ref name="bsdf" id="m_Emissive.003"/>
+        <emitter type="area">
+            <rgb name="radiance" value="500 347.5498 365.07678"/>
+        </emitter>
+    </shape>
+    <!--	Materials	-->
+    <bsdf type="twosided" id="m_Textured">
+        <bsdf type="principled">
+            <texture type="bitmap" name="base_color">
+                <string name="filename" value="textures/image.png"/>
+            </texture>
+            <float name="metallic" value="0"/>
+            <float name="roughness" value="1"/>
+        </bsdf>
+    </bsdf>
+    <bsdf type="principled" id="m_Glass2">
+        <rgb name="base_color" value="0.8 0.8 0.8"/>
+        <float name="metallic" value="0"/>
+        <float name="roughness" value="0"/>
+        <float name="spec_trans" value="1"/>
+        <float name="eta" value="1.5"/>
+    </bsdf>
+    <bsdf type="twosided" id="m_Mirror">
+        <bsdf type="principled">
+            <rgb name="base_color" value="0.80098534 0.59145063 0.6281384"/>
+            <float name="metallic" value="1"/>
+            <float name="roughness" value="0"/>
+        </bsdf>
+    </bsdf>
+    <bsdf type="principled" id="m_Glass">
+        <rgb name="base_color" value="0.48052895 0.2732985 0.80067885"/>
+        <float name="metallic" value="0"/>
+        <float name="roughness" value="0.33181819"/>
+        <float name="spec_trans" value="1"/>
+        <float name="eta" value="1.6"/>
+    </bsdf>
+    <bsdf type="twosided" id="m_Floor">
+        <bsdf type="principled">
+            <texture type="bitmap" name="base_color">
+                <string name="filename" value="textures/cherry-wood-texture.png"/>
+            </texture>
+            <float name="metallic" value="0"/>
+            <float name="roughness" value="0.027272727"/>
+        </bsdf>
+    </bsdf>
+    <bsdf type="twosided" id="m_Emissive.003">
+        <bsdf type="principled">
+            <rgb name="base_color" value="0.8 0.8 0.8"/>
+            <float name="metallic" value="0"/>
+            <float name="roughness" value="0.5"/>
+        </bsdf>
+    </bsdf>
+    <bsdf type="twosided" id="m_Material.003">
+        <bsdf type="principled">
+            <rgb name="base_color" value="0.33071813 0.24409923 0.80013347"/>
+            <float name="metallic" value="0.2"/>
+            <float name="roughness" value="0.19545454"/>
+        </bsdf>
+    </bsdf>
+</scene>

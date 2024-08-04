@@ -1,6 +1,8 @@
 /output/*
 *.blend1
 imgui.ini
+/scene/blender/*
+/scene/gltf/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
