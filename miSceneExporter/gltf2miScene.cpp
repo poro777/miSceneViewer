@@ -50,7 +50,7 @@ std::string decodeURL(const std::string& url) {
             return decodedChar;
         }
         return '%'; // Return '%' if not a valid encoding
-    };
+        };
 
     std::ostringstream decoded;
     for (int i = 0; i < url.length(); ++i) {
@@ -70,13 +70,14 @@ std::string decodeURL(const std::string& url) {
 class Shape
 {
 public:
-    Shape(std::string& id, std::string& filePath, aiNode* node, aiMesh* mesh)
-        :id(id), filePath(filePath), node(node), mesh(mesh)
+    Shape(std::string& id, std::string& filePath, aiNode* node, aiMesh* mesh, aiMatrix4x4& to_world)
+        :id(id), filePath(filePath), node(node), mesh(mesh), to_world(to_world)
     {}
     std::string id;
     std::string filePath;
     aiNode* node;
     aiMesh* mesh;
+    aiMatrix4x4 to_world;
 
 };
 
@@ -125,8 +126,8 @@ tinyxml2::XMLElement* createNameValueElement(tinyxml2::XMLDocument& doc, const c
 tinyxml2::XMLElement* createTransformElement(tinyxml2::XMLDocument& doc, const char* name, aiMatrix4x4& matrix) {
     /*
       <transform name="">
-			<matrix value="-0.0757886 0 -0.0468591 -1.95645 0 0.0891049 0 0.648205 0.0468591 0 -0.0757886 -1.77687 0 0 0 1" />
-	  </transform>
+            <matrix value="-0.0757886 0 -0.0468591 -1.95645 0 0.0891049 0 0.648205 0.0468591 0 -0.0757886 -1.77687 0 0 0 1" />
+      </transform>
     */
     auto transformElement = doc.NewElement("transform");
     transformElement->SetAttribute("name", name);
@@ -163,17 +164,16 @@ bool saveDocument(tinyxml2::XMLDocument& doc, std::string filePath) {
 /*
     export all mesh to .obj file
 */
-void exportObj(fs::path& outputFolder, fs::path& meshesFolder, aiScene* scene, 
-    aiNode* node, aiMatrix4x4& parentMatrix, std::vector<Shape>& shapes) {
+void exportObj(fs::path& outputFolder, fs::path& meshesFolder, aiScene* scene,
+    aiNode* node, aiMatrix4x4& parentMatrix, std::vector<bool>& exportedMesh, std::vector<Shape>& shapes) {
 
     aiMatrix4x4 transformMatrix = parentMatrix * node->mTransformation;
     aiNode* newNode = new aiNode;
     newNode->mName = node->mName;
-    // all mesh are in world space
-    newNode->mTransformation = transformMatrix;
     newNode->mNumMeshes = 1;
     newNode->mMeshes = new unsigned int[1];
     newNode->mMetaData = node->mMetaData;
+    newNode->mName = "ROOT";
 
     scene->mRootNode = newNode;
 
@@ -183,20 +183,25 @@ void exportObj(fs::path& outputFolder, fs::path& meshesFolder, aiScene* scene,
         if (node->mNumMeshes > 1) // split mesh
             shapeId = fmt::format("{}_{}", shapeId, i);
 
-        std::string relativeFilePath = fmt::format("{}/{}.obj", meshesFolder.string(), shapeId);
-
-        newNode->mMeshes[0] = node->mMeshes[i];
-        newNode->mName = shapeId;
-
-        Assimp::Exporter exporter;
-        if (exporter.Export(scene, "objnomtl", (outputFolder / relativeFilePath).string()) == AI_SUCCESS) {
-            fmt::println("Export mesh to {}", relativeFilePath);
-        }
-        else {
-            fmt::println("Error exporting: {}", exporter.GetErrorString());
-        }
         auto indexOfMesh = node->mMeshes[i];
-        shapes.push_back(Shape(shapeId, relativeFilePath, node, scene->mMeshes[indexOfMesh]));
+        auto mesh = scene->mMeshes[indexOfMesh];
+            
+        std::string relativeFilePath = fmt::format("{}/{}.obj", meshesFolder.string(), mesh->mName.C_Str());
+
+        if (exportedMesh[indexOfMesh] == false) {
+            newNode->mMeshes[0] = node->mMeshes[i];
+
+            // export mesh in local coordinate
+            Assimp::Exporter exporter;
+            if (exporter.Export(scene, "objnomtl", (outputFolder / relativeFilePath).string()) == AI_SUCCESS) {
+                fmt::println("Export mesh to {}", relativeFilePath);
+            }
+            else {
+                fmt::println("Error exporting: {}", exporter.GetErrorString());
+            }
+            exportedMesh[indexOfMesh] = true;
+        }
+        shapes.push_back(Shape(shapeId, relativeFilePath, node, mesh, transformMatrix));
     }
 
     newNode->mMetaData = nullptr;
@@ -204,11 +209,11 @@ void exportObj(fs::path& outputFolder, fs::path& meshesFolder, aiScene* scene,
 
     for (size_t i = 0; i < node->mNumChildren; i++)
     {
-        exportObj(outputFolder, meshesFolder, scene, node->mChildren[i], transformMatrix, shapes);
+        exportObj(outputFolder, meshesFolder, scene, node->mChildren[i], transformMatrix, exportedMesh ,shapes);
     }
 }
 
-void exportSceneMeshes(fs::path& outputFolder, fs::path& meshesFolder, const aiScene* scene, 
+void exportSceneMeshes(fs::path& outputFolder, fs::path& meshesFolder, const aiScene* scene,
     aiNode* node, std::vector<Shape>& shapes) {
 
     // copy scene with useful information
@@ -223,7 +228,8 @@ void exportSceneMeshes(fs::path& outputFolder, fs::path& meshesFolder, const aiS
 
     // export obj with mutable scene
     aiMatrix4x4 matrix;
-    exportObj(outputFolder, meshesFolder, newScene, scene->mRootNode, matrix, shapes);
+    std::vector<bool> alreadyExport(scene->mNumMeshes, false);
+    exportObj(outputFolder, meshesFolder, newScene, scene->mRootNode, matrix, alreadyExport, shapes);
 
     newScene->mRootNode = nullptr;
     newScene->mNumMeshes = 0;
@@ -256,7 +262,7 @@ void miIntegrator(tinyxml2::XMLDocument& doc, tinyxml2::XMLElement* docRoot) {
 /*
 *  out: cameras
 */
-void miSensor(tinyxml2::XMLDocument& doc, tinyxml2::XMLElement* docRoot, 
+void miSensor(tinyxml2::XMLDocument& doc, tinyxml2::XMLElement* docRoot,
     const aiScene* pScene, std::set<std::string>& cameras) {
     /*
          <sensor type="perspective">
@@ -288,7 +294,7 @@ void miSensor(tinyxml2::XMLDocument& doc, tinyxml2::XMLElement* docRoot,
         sensorElement->SetAttribute("id", cameraId.c_str());
 
         auto transformElement = createToWorldElement(doc, toWorldMatrix * cameraMarix);
-        
+
         sensorElement->InsertEndChild(transformElement);
 
         docRoot->InsertEndChild(sensorElement);
@@ -329,6 +335,10 @@ void miShape(tinyxml2::XMLDocument& doc, tinyxml2::XMLElement* docRoot, const ai
         // shape
         auto meshElement = createNameValueElement(doc, "string", "filename", shape.filePath.c_str());
         shapeElement->InsertEndChild(meshElement);
+
+        // to_world
+        auto toWorldElement = createToWorldElement(doc, shape.to_world);
+        shapeElement->InsertEndChild(toWorldElement);
 
         // material
         auto materialId = fmt::format("{}_{}", materialPrefix, material->GetName().C_Str());
@@ -491,7 +501,7 @@ void copyTextures(std::set<fs::path>& textures, fs::path& outputFolder, fs::path
     }
 }
 
-void setAnimatedParent(tinyxml2::XMLDocument& doc, tinyxml2::XMLElement* docRoot, 
+void setAnimatedParent(tinyxml2::XMLDocument& doc, tinyxml2::XMLElement* docRoot,
     std::string& animatedParent, aiNode* node) {
     /*
         <shape id="s_Handle">
@@ -514,7 +524,7 @@ void setAnimatedParent(tinyxml2::XMLDocument& doc, tinyxml2::XMLElement* docRoot
 
             docRoot->InsertEndChild(shapeElement);
         }
-        
+
         setAnimatedParent(doc, docRoot, animatedParent, node->mChildren[i]);
     }
 }
@@ -522,7 +532,7 @@ void setAnimatedParent(tinyxml2::XMLDocument& doc, tinyxml2::XMLElement* docRoot
 /*
     create a new animation xml file
 */
-void exportAnimation(tinyxml2::XMLDocument& doc, tinyxml2::XMLElement* docRoot, 
+void exportAnimation(tinyxml2::XMLDocument& doc, tinyxml2::XMLElement* docRoot,
     const aiScene* scene, std::set<std::string>& cameras) {
     /*
     <shape id="s_Door" max="177">
@@ -678,7 +688,7 @@ int main(int argc, char* argv[]) {
     if (saveDocument(doc, outputScenePath) == false) {
         return -1;
     }
-    
+
     if (pScene->mNumAnimations > 0) {
         tinyxml2::XMLDocument aniDoc;
         auto aniDocRoot = aniDoc.NewElement("animation");
