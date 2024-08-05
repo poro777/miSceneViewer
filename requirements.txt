@@ -1,5 +1,5 @@
 drjit>=0.4.4
-numpy>=1.26.4
+numpy==1.26.4
 opencv-python>=4.10.0.84
 pygame>=2.5.2
 imgui[pygame]>=2.0.0
