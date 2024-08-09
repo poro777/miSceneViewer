@@ -52,7 +52,7 @@ Some sample scenes can be found [here](./scene/)
 - Install dependency `assimp`, `fmt` and `tinyxml2` which can be installed via `vcpkg`.
 - Complie the file `miSceneExporter/gltf2miScene.cpp` using c++17.
 - Run `gltf2miScene.exe path_to_gltf_file.gltf`.
-- The results are located in `output/` under the current folder.
+- The results are located in `miScene/` under the current folder.
 ```
 output
 |- textures

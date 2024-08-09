@@ -381,6 +381,18 @@ void miShape(tinyxml2::XMLDocument& doc, tinyxml2::XMLElement* docRoot, const ai
     for (auto& emitter : emitters) {
         docRoot->InsertEndChild(emitter);
     }
+    if (emitters.size() == 0) {
+        /*<emitter type="constant">
+            <rgb name="radiance" value="1.0"/>
+        </emitter>*/
+        docRoot->InsertEndChild(createComment(doc, "There is no emitter in the scene. Create a constant environment emitter."));
+
+        auto envElement = doc.NewElement("emitter");
+        envElement->SetAttribute("type", "constant");
+        auto element = createNameValueElement(doc, "rgb", "radiance", 3.0f);
+        envElement->InsertEndChild(element);
+        docRoot->InsertEndChild(envElement);
+    }
 }
 
 /*  out: textures */
@@ -567,9 +579,9 @@ void exportAnimation(tinyxml2::XMLDocument& doc, tinyxml2::XMLElement* docRoot,
                 channel->mNumRotationKeys > 1 && channel->mNumRotationKeys != step ||
                 channel->mNumScalingKeys > 1 && channel->mNumScalingKeys != step) {
                 fmt::println("Cannot handle keys different sizes pos:{}, rot:{}, scale{}", channel->mNumPositionKeys, channel->mNumRotationKeys, channel->mNumScalingKeys);
+                continue;
             }
 
-            // TODO: two meshs
             auto node = scene->mRootNode->FindNode(channel->mNodeName);
             fmt::println("Find animated object: {}", node->mName.C_Str());
 
@@ -644,7 +656,7 @@ int main(int argc, char* argv[]) {
     }
 
     fs::path inputFile = (argc > 1) ? argv[1] : "./data/untitled.gltf";
-    fs::path outputFolder = "./output";
+    fs::path outputFolder = "./miScene";
     fs::path meshesFolder = "models";
     fs::path textureFolder = "textures";
     const char* outputSceneFileName = "scene.xml";
