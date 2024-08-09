@@ -74,7 +74,10 @@ class ptrace_Integrator(mitsuba_Integrator):
 class path_info_Integrator(mitsuba_Integrator):
     def __init__(self, scene) -> None:
         super().__init__(scene)
-        
+        self.itemsName = ["Image", "Position", "Albedo", "Normal"]
+        self.items = ["img", "pos", "alb", "nor"]
+        self.showItem = 0
+
     def name(self):
         return "Path"
         
@@ -102,7 +105,10 @@ class path_info_Integrator(mitsuba_Integrator):
         }  
     
     def postprocess(self, images, sys_info):
-        return images["img"]
+        return images[self.items[self.showItem]]
+
+    def gui(self):
+        changed, self.showItem = imgui.combo("Render result", self.showItem, self.itemsName)
 
     def save_image(self, images):
         images = {k:to_np(v) for k,v in images.items()}
