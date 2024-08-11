@@ -19,6 +19,7 @@ from viewer.execution_time import *
 from viewer.base import *
 from viewer.dataset import *
 from viewer.metric import *
+from viewer.my_gl import *
 
 @dataclass
 class variable:
@@ -59,28 +60,6 @@ class variable:
     time = 0
     animate_camera = True
 
-def load_surface(image, resize = None):
-    '''resize (W, H)'''
-    surface = pygame.surfarray.make_surface(to_np(image).swapaxes(0,1))
-    if resize is not None:
-        surface = pygame.transform.scale(surface, resize)
-    return surface
-
-def load_texture(textureSurface):
-
-    textureData = pygame.image.tostring(textureSurface, "RGBA", False)
-
-    width = textureSurface.get_width()
-    height = textureSurface.get_height()
-
-    texture = gl.glGenTextures(1)
-    gl.glBindTexture(gl.GL_TEXTURE_2D, texture)
-    gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MAG_FILTER, gl.GL_LINEAR)
-    gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MIN_FILTER, gl.GL_LINEAR)
-    gl.glTexImage2D(gl.GL_TEXTURE_2D, 0, gl.GL_RGBA, width, height, 0, gl.GL_RGBA,
-                    gl.GL_UNSIGNED_BYTE, textureData)
-
-    return texture, width, height
 
 
 class render_system:
@@ -102,7 +81,7 @@ class render_system:
         self.draging = False
         self.progress_image = None
 
-        
+
         self.integrator_list : List[Integrator] = []
 
         if integrators is not None:
@@ -126,6 +105,7 @@ class render_system:
         self.already_init = False
 
         self.snapshot = snapshot
+        self.resizeTexture = False # gl texture
 
     def change_integrator(self, id):
         assert(id < len(self.integrator_list) and id >= 0)
@@ -164,6 +144,9 @@ class render_system:
         self.integrator.resize(self.width, self.height, self.var.fov)
         self.sample_guard()
         self.view_change = True
+
+        if withPyCuda:
+            self.resizeTexture = True
 
     def sample_guard(self):
         '''prevent low FPS'''
@@ -289,7 +272,7 @@ class render_system:
         gui.render(imgui.get_draw_data())
 
     @measure_execution_time
-    def image_frame(self, image, linear_input = True, float_input = True):
+    def image_frame(self, image: torch.Tensor, linear_input = True, float_input = True, cudaTensor = True):
         '''image in tensor (H, W, 3) or (H, W, 4) linear srgb uint8 float'''
         if image.shape[2] == 4:
             image = image[:, :, :3]
@@ -301,13 +284,15 @@ class render_system:
 
         self.render_image = image
 
-        w,h = self.var.windowWidth , self.var.windowHeight 
-        surface = pygame.surfarray.make_surface(to_np(image).swapaxes(0,1))
-        surface = pygame.transform.scale(surface, (w, h))
-        pygame.draw.circle(surface, (0,0,255), (w//2, h//2), 3)
-        textData = pygame.image.tostring(surface, "RGBA", True)
-        gl.glWindowPos2i(0, 0)
-        gl.glDrawPixels(w, h, gl.GL_RGBA, gl.GL_UNSIGNED_BYTE, textData)
+        # add a center point
+        center = image.shape[0]//2, image.shape[1]//2
+        image[center[0] -2 : center[0] + 2, center[1]-2:center[1] + 2] = torch.tensor([0,0,255]) # blue color
+
+        if withPyCuda and cudaTensor:
+            copy_tensor_to_texture(image, self.texture_id, self.cuda_gl_texture)
+            render_texture(self.texture_id)
+        else:
+            render_cpu_array(to_np(image), self.var.windowWidth , self.var.windowHeight)
     
     def get_key(self, key):
         speed = self.var.MOVE_SPEED
@@ -407,11 +392,21 @@ class render_system:
         return image
     
     def init_main(self):
+        global withPyCuda
         # Initialize Pygame
         pygame.init()
         screen = pygame.display.set_mode((self.var.windowWidth, self.var.windowHeight), pygame.DOUBLEBUF | pygame.OPENGL | pygame.RESIZABLE)
         pygame.display.set_caption(self.var.windowName)
 
+        
+        try:
+            if withPyCuda:
+                import pycuda.gl.autoinit
+                gl.glEnable(gl.GL_TEXTURE_2D)
+                self.texture_id , self.cuda_gl_texture = create_map_texture(self.width, self.height)
+        except:
+            withPyCuda = False
+        print("With PyCuda =", withPyCuda)
         # Initialize imgui
         imgui.create_context()
         self.gui = PygameRenderer()
@@ -485,17 +480,19 @@ class render_system:
             else:
                 image = self.flip.getErrorMap()
             
-            self.image_frame(image, linear_input=False)
+            self.image_frame(image, linear_input=False, cudaTensor=False)
 
         if self.var.snapshot_output and self.render_image is not None:
             self.snapshot.write_images(to_np(self.render_image), sys_info)
 
         self.gui_frame(self.gui)
 
-        pygame.display.flip()
 
     def quit_main(self):
         # Quit Pygame
+        if withPyCuda:
+            self.cuda_gl_texture.unregister()
+            delete_gl_texture(self.texture_id)
         pygame.quit()
         self.already_init = False
 
@@ -504,6 +501,15 @@ class render_system:
             self.init_main()
             while self.running:
                 self.frame_input()
+                if withPyCuda and self.resizeTexture and self.var.stop == False:
+                    self.cuda_gl_texture.unregister()
+                    delete_gl_texture(self.texture_id)
+                    self.texture_id , self.cuda_gl_texture= create_map_texture(self.width, self.height)
+                    self.resizeTexture = False
+                    # unknown bugs in cuda/gl/mitsuba, Unable to render a frame after resizing textire
+                    # rendering one frame but not showing it on the screen to hide errors
+                    self.frame_main() 
                 self.frame_main()
+                pygame.display.flip()
         finally:
             self.quit_main()

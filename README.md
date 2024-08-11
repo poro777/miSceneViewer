@@ -10,10 +10,19 @@ Simple mitsube viewer in pygame.
 ![](/images/miViewer.png)
 
 ## Requirements
-Install PyTorch(cuda), [FLIP](https://github.com/NVlabs/flip)(If you want to use) and packages in requiremetns.txt
+Install PyTorch(cuda) and packages in requiremetns.txt
+
+### Optional
+- [FLIP](https://github.com/NVlabs/flip): Show error map.
+
+- [pycuda](https://github.com/inducer/pycuda): Render the image without copying torch.tensor to host memory. You can install pycuda with gl extension.
+1. Clone  `git clone https://github.com/inducer/pycuda.git --recursive`
+2. Create siteconf.py file `python ./configure.py --cuda-enable-gl`
+3. Build `python setup.py build`
+4. Install `python setup.py install`
 
 ## Run
-`python ./main.py`
+Run the default scene `python ./main.py`
 
 ## Viewer Control
 - `WASD`: fps control

@@ -30,7 +30,7 @@ class flipError:
         self.test = test
         
         #print("test:" ,self.test.max(),"gt:", self.gt.max())
-        self.errorMap, self.meanError, parameters = flip.evaluate(gt, test, "LDR")
+        self.errorMap, self.meanError, parameters = flip.evaluate(gt, test, "LDR", inputsRGB=False)
 
         return self.meanError
     def getGT(self, return_srgb = True):
