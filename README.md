@@ -15,8 +15,8 @@ Install PyTorch(cuda) and packages in requiremetns.txt
 ### Optional
 - [FLIP](https://github.com/NVlabs/flip): Show error map.
 
-- [pycuda](https://github.com/inducer/pycuda): Render the image without copying torch.tensor to host memory. You can install pycuda with gl extension.
-1. Clone  `git clone https://github.com/inducer/pycuda.git --recursive`
+- [pycuda](https://github.com/inducer/pycuda): Render the image without copying torch.tensor to host memory. Install pycuda with gl extension.
+1. Clone  `git clone --recursive https://github.com/inducer/pycuda.git `
 2. Create siteconf.py file `python ./configure.py --cuda-enable-gl`
 3. Build `python setup.py build`
 4. Install `python setup.py install`

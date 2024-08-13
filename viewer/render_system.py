@@ -105,7 +105,6 @@ class render_system:
         self.already_init = False
 
         self.snapshot = snapshot
-        self.resizeTexture = False # gl texture
 
     def change_integrator(self, id):
         assert(id < len(self.integrator_list) and id >= 0)
@@ -146,7 +145,9 @@ class render_system:
         self.view_change = True
 
         if withPyCuda:
-            self.resizeTexture = True
+            self.cuda_gl_texture.unregister()
+            delete_gl_texture(self.texture_id)
+            self.texture_id , self.cuda_gl_texture= create_map_texture(self.width, self.height)
 
     def sample_guard(self):
         '''prevent low FPS'''
@@ -377,7 +378,7 @@ class render_system:
         
         if self.var.progress:
             if self.progress_image is None or self.progress_image.shape != image.shape:
-                self.progress_image = image
+                self.progress_image = torch.zeros_like(image, device="cuda")
                 self.var.progress_t = 0
             self.var.progress_t += 1
             self.progress_image = (self.progress_image * (self.var.progress_t - 1) + image) / self.var.progress_t
@@ -407,6 +408,7 @@ class render_system:
         except:
             withPyCuda = False
         print("With PyCuda =", withPyCuda)
+
         # Initialize imgui
         imgui.create_context()
         self.gui = PygameRenderer()
@@ -486,7 +488,7 @@ class render_system:
             self.snapshot.write_images(to_np(self.render_image), sys_info)
 
         self.gui_frame(self.gui)
-
+        pygame.display.flip()
 
     def quit_main(self):
         # Quit Pygame
@@ -501,15 +503,6 @@ class render_system:
             self.init_main()
             while self.running:
                 self.frame_input()
-                if withPyCuda and self.resizeTexture and self.var.stop == False:
-                    self.cuda_gl_texture.unregister()
-                    delete_gl_texture(self.texture_id)
-                    self.texture_id , self.cuda_gl_texture= create_map_texture(self.width, self.height)
-                    self.resizeTexture = False
-                    # unknown bugs in cuda/gl/mitsuba, Unable to render a frame after resizing textire
-                    # rendering one frame but not showing it on the screen to hide errors
-                    self.frame_main() 
                 self.frame_main()
-                pygame.display.flip()
         finally:
             self.quit_main()

@@ -4,11 +4,14 @@ import OpenGL.GL as gl
 import torch
 import pygame
 
+# change to True to enable pycuda.
+withPyCuda = False
 try:
-    import pycuda.gl as cudagl
-    import pycuda.autoinit
-    import pycuda.driver as cuda
-    withPyCuda = True
+    if withPyCuda:
+        import pycuda.gl as cudagl
+        import pycuda.autoinit
+        import pycuda.driver as cuda
+        print("Warning: may have mi.render() bugs after import pycuda. Make sure everything is correct before enabling.")
 except:
     withPyCuda = False
 
@@ -17,7 +20,7 @@ def delete_gl_texture(texture_id):
     gl.glDeleteTextures([texture_id])
 
 def create_gl_texture(width, height):
-    img_data = Image.fromarray(np.zeros((height,width,4)).astype(np.uint8)).tobytes("raw", "RGBA", 0, -1)
+    img_data = Image.fromarray(np.zeros((height,width,4)).astype(np.uint8)).tobytes("raw", "RGBA")
 
     texture_id = gl.glGenTextures(1)
     gl.glBindTexture(gl.GL_TEXTURE_2D, texture_id)
