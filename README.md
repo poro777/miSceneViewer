@@ -22,7 +22,7 @@ Install PyTorch(cuda) and packages in requiremetns.txt
 4. Install `python setup.py install`
 
 ## Run
-Run the default scene `python ./main.py`
+Run the default scene `python ./main.py` or `python ./main.py -p [path to directory]`
 
 ## Viewer Control
 - `WASD`: fps control

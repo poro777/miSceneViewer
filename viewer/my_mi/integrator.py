@@ -79,7 +79,7 @@ class path_info_Integrator(mitsuba_Integrator):
         self.showItem = 0
 
     def name(self):
-        return "Path"
+        return "PathInfo"
         
     def update(self, depth):
         self.object =  mi.load_dict({

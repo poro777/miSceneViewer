@@ -6,19 +6,20 @@ from viewer.execution_time import *
 import mitsuba as mi
 import numpy as np
 
-def mitsuba_interactive_window(path, output):
+def mitsuba_interactive_window(path, outputFolder):
     from viewer import my_mi
 
     sceneFile = os.path.join(path, "scene.xml")
     animationFile = os.path.join(path, "animation.xml")
     scene = my_mi.mitsuba_scene(sceneFile, animationFile)
 
-    # TODO
-    
-    dataset = viewer.Dataset(os.path.join(output, "images"), 512)
-    sanpshot = viewer.Dataset(os.path.join(output, "snapshot"))
+    if not os.path.exists(outputFolder):
+        os.mkdir(outputFolder)
+    dataset = viewer.Dataset(os.path.join(outputFolder, "images"), 512)
+    sanpshot = viewer.Dataset(os.path.join(outputFolder, "snapshot"))
 
     integrators = [
+        my_mi.path_Integrator(scene.object),
         my_mi.path_info_Integrator(scene.object),
         my_mi.ptrace_Integrator(scene.object)
     ]
@@ -38,7 +39,10 @@ def mitsuba_interactive_window(path, output):
     return sys
 
 if __name__ == "__main__":
-    outputFolder = "./output/"
-    if not os.path.exists(outputFolder):
-        os.mkdir(outputFolder)
-    mitsuba_interactive_window("./scene/miScene/", outputFolder)
+    import argparse
+    parser = argparse.ArgumentParser(description="A script that accepts a path argument")
+    parser.add_argument("-p", "--path", type=str, default="./scene/miScene/", help="Path to the directory (default: './scene/miScene/')")
+    parser.add_argument("-o", "--output", type=str, default="./output/", help="Output path to the directory (default: './output/')")
+
+    args = parser.parse_args()
+    mitsuba_interactive_window(args.path, args.output)
