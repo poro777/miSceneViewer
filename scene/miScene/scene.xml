@@ -134,6 +134,10 @@
             <rgb name="radiance" value="500 347.5498 365.07678"/>
         </emitter>
     </shape>
+    <emitter type="constant">
+        <!-- Add a small environment emitter to prevent empty color -->
+        <rgb name="radiance" value="0.001"/>
+    </emitter>
     <!--	Materials	-->
     <bsdf type="twosided" id="m_Textured">
         <bsdf type="principled">

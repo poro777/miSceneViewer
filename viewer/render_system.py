@@ -305,7 +305,7 @@ class render_system:
                 progress_image = (progress_image * t + image) / (t + 1)
 
             self.change_integrator(self.var.selected_integrator)
-            return to_np(progress_image)
+            return to_np(progress_image[:,:,:3])
         else:
             # load image from dataset
             info = self.dataset.info[self.var.selected_dataset_sensor]
@@ -352,7 +352,7 @@ class render_system:
         except:
             withPyCuda = False
         print("With PyCuda =", withPyCuda)
-
+        print("With FLIP =", withFlip)
         # Initialize imgui
         imgui.create_context()
         self.gui = PygameRenderer()
@@ -412,7 +412,8 @@ class render_system:
             image = self.postprocess(images, sys_info)
 
             if self.var.once.eval_flip:
-                self.flip.evaluate(self.render_gt(), to_np(image[:,:,:3]))
+                range = self.var.flip.range_list[self.var.flip.selected_range]
+                self.var.flip.error = self.flip.evaluate(self.render_gt(), to_np(image[:,:,:3]), range)
                 self.var.flip.display = True
 
             self.image_frame(image)

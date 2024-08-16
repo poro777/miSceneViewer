@@ -69,11 +69,15 @@ class Flip:
     display = False
     
     selected_type = 0
-
+    selected_range = 0
+    error = None
     name_list = ["Flip", "GT", "Test"]
+    range_list = ["HDR", "LDR"]
 
     def gui(self):
         changed, self.display = imgui.checkbox("Show flip", self.display)
+        imgui.text(f"Error: {self.error}")
+        _, self.selected_range = imgui.combo("Range", self.selected_range, self.range_list)
         _, self.selected_type = radio_button(self.name_list, self.selected_type)
         return changed
     

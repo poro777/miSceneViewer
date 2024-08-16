@@ -16,23 +16,28 @@ class flipError:
         self.gt = flipError.BLACK
         self.test = flipError.BLACK
 
-    def evaluate(self, gt: np.ndarray, test: np.ndarray):
+    def evaluate(self, gt: np.ndarray, test: np.ndarray, range = "HDR"):
         '''input np.array (H, W, 3) linear image'''
+        if not withFlip:
+            return None
+        
         if gt.shape != test.shape:
             self.errorMap = flipError.BLACK
             self.meanError = 0
             print(f"Size not match {gt.shape}, {test.shape}")
-            return
-        
-        if not withFlip:
-            return 0.0
+            return None
+                
+        if range not in ["HDR", "LDR"]:
+            range = "LDR"
+
         self.gt = gt
         self.test = test
-        
+
         #print("test:" ,self.test.max(),"gt:", self.gt.max())
-        self.errorMap, self.meanError, parameters = flip.evaluate(gt, test, "HDR", inputsRGB=False)
+        self.errorMap, self.meanError, parameters = flip.evaluate(gt, test, range, inputsRGB=False)
 
         return self.meanError
+    
     def getGT(self, return_srgb = True):
         '''return float image'''
         if return_srgb:
