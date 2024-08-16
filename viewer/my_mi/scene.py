@@ -1,4 +1,3 @@
-from viewer.base.scene import Scene
 import mitsuba as mi
 from viewer.common import cartesian_to_spherical
 import torch
@@ -6,43 +5,59 @@ import numpy as np
 from viewer.animation import *
 import drjit as dr
 
-class mitsuba_scene(Scene):
+def matrix2camera(toWorld):
+        origin = np.array(toWorld @ mi.Point3f(0,0,0))
+        direction = np.array(toWorld @ mi.Vector3f(0,0,1))
+        return origin[0], cartesian_to_spherical(torch.tensor(direction), "cpu", False)[0].numpy()
+
+class mitsuba_scene:
     def __init__(self, scene_xml, animation_xml = None) -> None:
         super().__init__()
         
         self.object = mi.load_file(scene_xml)
-        self.animation = load_animation(animation_xml) if (animation_xml is not None) else {}
-        self.animated_shape_initial_state = {}
-
+        self.camera_id = None
         self.camera_to_world = None
         self.params = mi.traverse(self.object)
 
-        
-        self.sensors = [sensor.id() for sensor in self.object.sensors()]
-
-        # use first camera
-        if len(self.sensors) > 0:
-            self.camera = self.sensors[0]
-            if f'{self.sensors[0]}.to_world' in self.params:
-                self.camera_to_world = self.params[f'{self.sensors[0]}.to_world']
-            elif 'PerspectiveCamera.to_world' in self.params:
-                self.camera_to_world = self.params['PerspectiveCamera.to_world']
-            else:
-                print(f"Cannot load default sensor {self.camera} in file")
+        self.showCamera = 0
 
         self.time = 0
-        for name, animation in self.animation.items():
+        self.animation = load_animation(animation_xml) if (animation_xml is not None) else {}
+        self.animated_shape_initial_state = {}
+ 
+        self.cameras_id:list[str] = [sensor.id() for sensor in self.object.sensors()]
+        self.cameras_to_world = []
+
+        unname_id = 0
+        for i, camera_id in enumerate(self.cameras_id):
+            if '_unnamed' in camera_id:
+                new_camera_id = 'PerspectiveCamera' if unname_id == 0 else f'PerspectiveCamera_{unname_id}'
+                self.cameras_to_world.append(self.params[f'{new_camera_id}.to_world'])
+                unname_id += 1
+                self.cameras_id[i] = new_camera_id
+            else:
+                self.cameras_to_world.append(self.params[f'{camera_id}.to_world'])
+
+        # use first camera
+        self.setCamera(0)
+
+        
+        # assume all animated object has id (not unnamed)
+        for id, animation in self.animation.items():
             self.time = max(self.time, animation.endTiem)
-            if f'{name}.vertex_positions' in self.params:  # shape
-                v = dr.unravel(mi.cuda_ad_rgb.Point3f, self.params[f'{name}.vertex_positions'])
+            if f'{id}.vertex_positions' in self.params:  # shape
+                v = dr.unravel(mi.cuda_ad_rgb.Point3f, self.params[f'{id}.vertex_positions'])
                 m0 = mi.cuda_ad_rgb.Transform4f(animation.getMatrix(0.0))
-                self.animated_shape_initial_state[name] = m0.inverse() @ v
-            elif f'{name}.to_world' in self.params:     # camera
-                self.camera_to_world = self.params[f'{name}.to_world']
-                self.camera  = name
+                self.animated_shape_initial_state[id] = m0.inverse() @ v
+            elif f'{id}.to_world' in self.params:     # camera
+                try:
+                    index = self.cameras_id.index(id)
+                except:
+                    print("camera id not found in cameras_id")
+                    continue
                 m0 = mi.cuda_ad_rgb.Transform4f(animation.getMatrix(0.0))
-                cameraMatrix = m0.inverse() @ self.camera_to_world
-                self.animated_shape_initial_state[name] = cameraMatrix
+                cameraMatrix = m0.inverse() @ self.cameras_to_world[index]
+                self.animated_shape_initial_state[id] = cameraMatrix
 
         
     def scene_bbox_info(self):
@@ -51,10 +66,7 @@ class mitsuba_scene(Scene):
         bbox_scale = list(bbox.max - bbox.min)
         return bbox_min, bbox_scale
 
-    def _matrix2camera(self, toWorld):
-        origin = np.array(toWorld @ mi.Point3f(0,0,0))
-        direction = np.array(toWorld @ mi.Vector3f(0,0,1))
-        return origin[0], cartesian_to_spherical(torch.tensor(direction), "cpu", False)[0].numpy()
+    
     
     def setTime(self, time):
         for name, animation in self.animation.items():
@@ -68,17 +80,26 @@ class mitsuba_scene(Scene):
     def getMaxTime(self):
         return self.time
     
+    def setCamera(self, index):
+        if index < 0 or index >= len(self.cameras_id):
+            return
+        self.camera_id = self.cameras_id[index]
+        self.camera_to_world = self.cameras_to_world[index]
+
     def getCamera(self, time):
-        if self.camera in self.animation:
-            animation = self.animation[self.camera]
-            camera_matrix = self.animated_shape_initial_state[self.camera]
+        if self.camera_id in self.animation:
+            animation = self.animation[self.camera_id]
+            camera_matrix = self.animated_shape_initial_state[self.camera_id]
             m = mi.cuda_ad_rgb.Transform4f(animation.getMatrix(time, applyScale=False))
-            return self._matrix2camera(m @ camera_matrix)
+            return matrix2camera(m @ camera_matrix)
         else:
             return self.get_default_camera()
 
     def get_default_camera(self):
-        if self.camera_to_world is not None:
-            return self._matrix2camera(self.camera_to_world)
+        if self.camera_id is not None:
+            return matrix2camera(self.camera_to_world)
         else:
             return np.array([0,0,0], dtype=float), np.array([0, np.pi/2])
+    
+    def gui(self):
+        pass

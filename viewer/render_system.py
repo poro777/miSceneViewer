@@ -16,57 +16,18 @@ mi.set_variant('cuda_ad_rgb')
 
 from viewer.common import *
 from viewer.execution_time import *
-from viewer.base import *
+from viewer.my_mi import *
 from viewer.dataset import *
 from viewer.metric import *
 from viewer.my_gl import *
-
-@dataclass
-class variable:
-    windowName = "Viewer"
-    windowWidth = 768
-    windowHeight = 768
-
-    auto_resize = True
-    SPP = 32
-    resoultion = 9
-
-    limit = (2 ** 26)
-
-    save_image = False
-    snapshot_output = False
-
-    stop = False
-    
-    MOVE_SPEED = 0.15
-    VIEW_SPEED = 0.003
-    depth = 6
-    selected_radio = 0
-    fov = 45
-    progress = False
-    progress_t = 0
-
-    save = False
-
-    store_gt = False
-    show_flip = False
-    eval_flip = False
-    show_flip_type = 0
-
-    sensor_id = -1
-
-    fps_guard = True
-
-    time = 0
-    animate_camera = True
-
+from viewer.gui import Variable, radio_button
 
 
 class render_system:
     Y = np.array([0,1,0]).astype(float)
     BLACK = torch.zeros((1,1,3)).cuda()
-    def __init__(self, scene: Scene, origin = None, angle = None, dataset:Dataset = None, var:variable = None, integrators:List[Integrator] = None, snapshot:Dataset = None,) -> None:
-        self.var = var if var is not None else variable()
+    def __init__(self, scene: mitsuba_scene, dataset:Dataset, snapshot:Dataset, origin = None, angle = None, var:Variable = None, integrators:List[Integrator] = None) -> None:
+        self.var = var if var is not None else Variable()
         self.clock = pygame.time.Clock()
 
         self.scene = scene
@@ -76,11 +37,15 @@ class render_system:
         if angle is not None:
             self.angle = np.array(angle).astype(float)
 
-        self.width = 2**self.var.resoultion
+        self.to_world = mi.Transform4f.look_at(self.origin, self.getTarget(), render_system.Y)
+
+        self.dataset = dataset
+        self.snapshot = snapshot
+
+        self.width = 2**self.var.sensor.resoultion
         self.height = self.width
         self.draging = False
         self.progress_image = None
-
 
         self.integrator_list : List[Integrator] = []
 
@@ -89,29 +54,22 @@ class render_system:
 
         self.change_integrator(0)
 
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
-
         # reset progress image if view change
         self.view_change = False
         
         self.app_live = 0
         self.waitingTimes = 0
-        self.dataset = dataset
-        self.flip = flipError()
 
-        # camera to world
-        self.to_world = None
+        self.flip = flipError()  
 
         self.already_init = False
-
-        self.snapshot = snapshot
 
     def change_integrator(self, id):
         assert(id < len(self.integrator_list) and id >= 0)
 
         self.integrator : Integrator = self.integrator_list[id]
-        self.integrator.update(self.var.depth)
-        self.integrator.resize(self.width, self.height, self.var.fov)
+        self.integrator.update(self.var.sensor.depth)
+        self.integrator.resize(self.width, self.height, self.var.sensor.fov)
 
     def getDirection(self):
         angle = self.angle
@@ -129,18 +87,16 @@ class render_system:
     @measure_execution_time
     def render(self, SPP = 32):
         with torch.no_grad():
-            if self.var.sensor_id == -1 or self.to_world is None:
-                self.to_world = mi.ScalarTransform4f.look_at(self.origin, self.getTarget(), render_system.Y)
-
+            self.to_world = mi.ScalarTransform4f.look_at(self.origin, self.getTarget(), render_system.Y)
             self.integrator.setCameraPose(self.to_world)
             return self.integrator.render(SPP)
 
     def setResoultion(self):
         '''call when resoultion or window size change'''
-        ratio = self.var.windowHeight / self.var.windowWidth if self.var.auto_resize else 1.0
-        self.width = min(2 ** self.var.resoultion, self.var.windowWidth)
+        ratio = self.var.window.windowHeight / self.var.window.windowWidth if self.var.window.auto_resize else 1.0
+        self.width = min(2 ** self.var.sensor.resoultion, self.var.window.windowWidth)
         self.height = int(self.width * ratio)
-        self.integrator.resize(self.width, self.height, self.var.fov)
+        self.integrator.resize(self.width, self.height, self.var.sensor.fov)
         self.sample_guard()
         self.view_change = True
 
@@ -151,27 +107,29 @@ class render_system:
 
     def sample_guard(self):
         '''prevent low FPS'''
-        if (self.var.SPP * self.height * self.width) > self.var.limit:
+        if (self.var.sensor.SPP * self.height * self.width) > self.var.sensor.limit:
             self.var.stop = True
 
     def gui_frame(self, gui):
         imgui.new_frame()
         
         self.clock.tick()
-        
+
+        self.var.once.reset()
+
         is_expand, show_custom_window = imgui.begin("Custom window", True)
         if is_expand:
             # information
-            self.fps = self.clock.get_fps()
-            if self.fps < 3 and self.app_live > 30 and self.var.fps_guard:
+            fps = self.clock.get_fps()
+            if fps < 3 and self.app_live > 30 and self.var.fps_guard:
                 self.waitingTimes += 1
                 if self.waitingTimes > 5:
                     self.var.stop = True
             else:
                 self.waitingTimes = 0
 
-            imgui.text(f"FPS: {self.fps}")
-            imgui.text(f"Window width:{self.var.windowWidth} height:{self.var.windowHeight}")
+            imgui.text(f"FPS: {fps}")
+            imgui.text(f"Window width:{self.var.window.windowWidth} height:{self.var.window.windowHeight}")
             imgui.text(f"Image width:{self.width} height:{self.height}")
             imgui.text(f"Position: {np.round(self.origin, 3)}")
             imgui.text(f"Direction: {np.round(self.angle, 3)}")
@@ -180,92 +138,75 @@ class render_system:
             if changed: self.sample_guard()
 
             if imgui.tree_node("Sensor"):
-                resoultion_changed, self.var.auto_resize = imgui.checkbox("Fit to Window", self.var.auto_resize)
+                resoultion_changed, self.var.window.auto_resize = imgui.checkbox("Fit to Window", self.var.window.auto_resize)
 
-                changed, self.var.resoultion = imgui.slider_int("resoultion", self.var.resoultion, 5, 11)
+                changed, self.var.sensor.resoultion = imgui.slider_int("resoultion", self.var.sensor.resoultion, 5, 11)
                 resoultion_changed = resoultion_changed or changed
                 
-                
-                _, self.var.SPP = imgui.slider_int("SPP", self.var.SPP, 1, 256)
+                _, self.var.sensor.SPP = imgui.slider_int("SPP", self.var.sensor.SPP, 1, 256)
 
-                depth_change, self.var.depth = imgui.slider_int("depth", self.var.depth, 1, 10)
+                depth_change, self.var.sensor.depth = imgui.slider_int("depth", self.var.sensor.depth, 1, 10)
 
-                fov_changed, self.var.fov = imgui.slider_int("fov", self.var.fov, 10, 90)
+                fov_changed, self.var.sensor.fov = imgui.slider_int("fov", self.var.sensor.fov, 10, 90)
 
                 if self.dataset is not None:
-                    sensor_changed, self.var.sensor_id = imgui.slider_int("Sensor", self.var.sensor_id, -1, self.dataset.n_sensor-1)
+                    sensor_changed, self.var.selected_dataset_sensor = imgui.slider_int("Sensor(dataset)", self.var.selected_dataset_sensor, -1, self.dataset.n_sensor-1)
                     if sensor_changed:
                         fov_changed = True
-                        if self.var.sensor_id != -1:  # default
-                            info = self.dataset.info[self.var.sensor_id]
-                            self.var.fov, self.to_world, self.origin = info['fov'], info['to_world'], info['origin']
+                        if self.var.selected_dataset_sensor != -1:
+                            info = self.dataset.info[self.var.selected_dataset_sensor]
+                            # TODO
+                            self.var.sensor.fov, to_world, self.origin = info['fov'], info['to_world'], info['origin']
+                            self.origin, self.angle = matrix2camera(to_world)
+
 
                 if depth_change:
-                    self.integrator.update(self.var.depth)
+                    self.integrator.update(self.var.sensor.depth)
+                    self.view_change = True
 
                 if resoultion_changed or fov_changed: 
                     self.setResoultion()
 
+                changed, self.var.selected_scene_sensor = imgui.combo("Sensor(scene)", self.var.selected_scene_sensor, self.scene.cameras_id)
+                if changed:
+                    self.scene.setCamera(self.var.selected_scene_sensor)
+                    self.origin, self.angle = self.scene.getCamera(self.var.animation.time)
+                    
                 imgui.tree_pop()
 
             if imgui.tree_node("Progress"):
-                changed, self.var.progress = imgui.checkbox("Progress", self.var.progress)
+                changed = self.var.progress.gui()
                 if changed:
                     self.progress_image = None # reset image
-
-                imgui.same_line()
-                imgui.text(f"t: {self.var.progress_t}")
                 imgui.tree_pop()
 
             if imgui.tree_node("FLIP"):
-                self.var.eval_flip = False
                 if imgui.button("Evaluate flip"):
-                    self.var.eval_flip = True
-
-                changed, self.var.show_flip = imgui.checkbox("Show flip", self.var.show_flip)
-                name_list = ["Flip", "GT", "Test"]
-                for i, name in enumerate(name_list):
-                    if imgui.radio_button(name, self.var.show_flip_type == i):
-                        self.var.show_flip_type = i
-                    imgui.same_line()
-                imgui.new_line()
+                    self.var.once.eval_flip = True
+                self.var.flip.gui()
                 imgui.tree_pop()
                 
             if imgui.tree_node("Animation"):
-                changed, self.var.animate_camera = imgui.checkbox("Camera", self.var.animate_camera)
-                changed, self.var.time = imgui.slider_int("Time", self.var.time, 0, self.scene.getMaxTime())
+                changed = self.var.animation.gui(self.scene.getMaxTime())
                 if changed:
-                    self.scene.setTime(self.var.time)
-                    if self.var.animate_camera:
-                        self.origin, self.angle = self.scene.getCamera(self.var.time)
+                    self.scene.setTime(self.var.animation.time)
+                    if self.var.animation.animate_camera:
+                        self.origin, self.angle = self.scene.getCamera(self.var.animation.time)
                     self.view_change = True
                 imgui.tree_pop()
-
-            for i, integrator in enumerate(self.integrator_list):
-                if imgui.radio_button(integrator.name(), self.var.selected_radio == i):
-                    self.var.selected_radio = i
-                    self.progress_image = None
-                    self.change_integrator(self.var.selected_radio)
-
-                imgui.same_line()
-            imgui.new_line()
+            
+            changed, self.var.selected_integrator = radio_button([i.name() for i in self.integrator_list], self.var.selected_integrator)
+            if changed:
+                self.progress_image = None
+                self.change_integrator(self.var.selected_integrator)
 
             self.integrator.gui()
             
-            if imgui.button("Random"):
-                min, scale = self.scene.scene_bbox_info()
-                min = np.array(min)
-                scale = np.array(scale)
-                self.origin = np.random.random(3) * scale + min
-                self.angle = np.random.random(2) * np.array([2*np.pi, np.pi/4])+ np.array([-np.pi, 3*np.pi/8])
-                self.view_change = True
-            self.var.save = False
             if imgui.button("Save image"):
-                self.var.save = True
+                self.var.once.save_output = True
 
-            self.var.snapshot_output = False
             if imgui.button("Snapshot"):
-                self.var.snapshot_output = True
+                self.var.once.snapshot_output = True
 
         imgui.end()
 
@@ -293,10 +234,10 @@ class render_system:
             copy_tensor_to_texture(image, self.texture_id, self.cuda_gl_texture)
             render_texture(self.texture_id)
         else:
-            render_cpu_array(to_np(image), self.var.windowWidth , self.var.windowHeight)
+            render_cpu_array(to_np(image), self.var.window.windowWidth , self.var.window.windowHeight)
     
     def get_key(self, key):
-        speed = self.var.MOVE_SPEED
+        speed = self.var.speed.move
         previous = np.array(self.origin)
         if key[pygame.K_w]:
             self.origin += self.getDirection() * speed
@@ -314,7 +255,7 @@ class render_system:
             self.origin -= render_system.Y * speed
 
         if key[pygame.K_r]:
-            self.origin, self.angle = self.scene.get_default_camera()
+            self.origin, self.angle = self.scene.getCamera(self.var.animation.time)
 
         if np.any(previous != self.origin):
             self.view_change = True
@@ -339,16 +280,19 @@ class render_system:
                 pos = np.array(event.pos)
                 offset = self.pre_pos - pos
                 offset[1] = -offset[1]
-                self.angle += offset * self.var.VIEW_SPEED
+                self.angle += offset * self.var.speed.view
                 self.pre_pos = pos
             self.angle[1] = np.clip(self.angle[1], 1e-5, np.pi - 1e-5)
 
     def render_gt(self, total_spp = 512) -> np.ndarray:
-        if self.var.sensor_id == -1:
+        if self.var.selected_dataset_sensor == -1:
             spp = 32
             for i, integrator in enumerate(self.integrator_list):
                 if integrator.name() == "Path":
                     break
+            else:
+                print("Path integrator not found!")
+                return np.zeros((self.width, self.height, 3))
             
             self.change_integrator(i)
 
@@ -360,11 +304,11 @@ class render_system:
                     progress_image = torch.zeros_like(image).cuda()
                 progress_image = (progress_image * t + image) / (t + 1)
 
-            self.change_integrator(self.var.selected_radio)
+            self.change_integrator(self.var.selected_integrator)
             return to_np(progress_image)
         else:
             # load image from dataset
-            info = self.dataset.info[self.var.sensor_id]
+            info = self.dataset.info[self.var.selected_dataset_sensor]
             img, *_ = self.dataset.load_id(info)
             return cv2.resize(img, (self.width, self.height))
 
@@ -376,15 +320,15 @@ class render_system:
         '''
         image = self.integrator.postprocess(images, sys_info)
         
-        if self.var.progress:
+        if self.var.progress.enable:
             if self.progress_image is None or self.progress_image.shape != image.shape:
                 self.progress_image = torch.zeros_like(image, device="cuda")
-                self.var.progress_t = 0
-            self.var.progress_t += 1
-            self.progress_image = (self.progress_image * (self.var.progress_t - 1) + image) / self.var.progress_t
+                self.var.progress.t = 0
+            self.var.progress.t += 1
+            self.progress_image = (self.progress_image * (self.var.progress.t - 1) + image) / self.var.progress.t
             image = self.progress_image
 
-        if self.var.save:
+        if self.var.once.save_output:
             output = self.integrator.save_image(images)
             if output["img"] is None:
                 output["img"] = to_np(image)
@@ -396,8 +340,8 @@ class render_system:
         global withPyCuda
         # Initialize Pygame
         pygame.init()
-        screen = pygame.display.set_mode((self.var.windowWidth, self.var.windowHeight), pygame.DOUBLEBUF | pygame.OPENGL | pygame.RESIZABLE)
-        pygame.display.set_caption(self.var.windowName)
+        screen = pygame.display.set_mode((self.var.window.windowWidth, self.var.window.windowHeight), pygame.DOUBLEBUF | pygame.OPENGL | pygame.RESIZABLE)
+        pygame.display.set_caption(self.var.window.windowName)
 
         
         try:
@@ -414,7 +358,7 @@ class render_system:
         self.gui = PygameRenderer()
         io = imgui.get_io()
         io.fonts.add_font_default()
-        io.display_size = (self.var.windowWidth, self.var.windowHeight)
+        io.display_size = (self.var.window.windowWidth, self.var.window.windowHeight)
         self.sample_guard()
         # Main loop
         self.running = True
@@ -431,7 +375,7 @@ class render_system:
             if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
                 self.running = False
             elif  event.type == pygame.VIDEORESIZE:
-                self.var.windowWidth, self.var.windowHeight = event.w, event.h
+                self.var.window.windowWidth, self.var.window.windowHeight = event.w, event.h
                 self.setResoultion()
 
             self.mouse_callback(event)
@@ -458,33 +402,34 @@ class render_system:
             "scene_min": scene_min,
             "origin": self.origin,
             "direction": self.getDirection(),
-            "device": self.device,
-            "fov": self.var.fov,
+            "fov": self.var.sensor.fov,
             "to_world": self.to_world,
             "scene": self.scene
         }
 
-        if self.var.stop == False and self.var.show_flip == False:
-            images = self.render(self.var.SPP)
+        if self.var.stop == False and self.var.flip.display == False:
+            images = self.render(self.var.sensor.SPP)
             image = self.postprocess(images, sys_info)
+
+            if self.var.once.eval_flip:
+                self.flip.evaluate(self.render_gt(), to_np(image[:,:,:3]))
+                self.var.flip.display = True
 
             self.image_frame(image)
 
-            if self.var.eval_flip:
-                self.flip.evaluate(self.render_gt(), to_np(image))
-                self.var.show_flip = True
+            
 
-        if self.var.show_flip:
-            if self.var.show_flip_type == 1:
+        if self.var.flip.display:
+            if self.var.flip.selected_type == 1:
                 image = self.flip.getGT()
-            elif self.var.show_flip_type == 2:
+            elif self.var.flip.selected_type == 2:
                 image = self.flip.getTest()
             else:
                 image = self.flip.getErrorMap()
             
-            self.image_frame(image, linear_input=False, cudaTensor=False)
+            self.image_frame(torch.tensor(image), linear_input=False, cudaTensor=False)
 
-        if self.var.snapshot_output and self.render_image is not None:
+        if self.var.once.snapshot_output and self.render_image is not None:
             self.snapshot.write_images(to_np(self.render_image), sys_info)
 
         self.gui_frame(self.gui)

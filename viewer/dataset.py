@@ -108,7 +108,7 @@ class Dataset():
 
         for i, sensor in self.sensors.items():
             m = sensor['to_world']
-            fov, to_world, origin = sensor["fov"], mi.ScalarTransform4f(m), np.array([m[0][3], m[1][3], m[2][3]])
+            fov, to_world, origin = sensor["fov"], mi.Transform4f(m), np.array([m[0][3], m[1][3], m[2][3]])
 
             parsed_dict = {
                 'id': i,

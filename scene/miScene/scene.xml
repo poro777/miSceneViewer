@@ -9,6 +9,11 @@
             <matrix value="-0.49839294 -0.13465074 -0.85643077 13.948181 -0.0625153 0.9908751 -0.11940822 5.4907393 0.86469436 -0.005972177 -0.5022629 13.052786 0 0 0 1"/>
         </transform>
     </sensor>
+    <sensor type="perspective">
+        <transform name="to_world">
+            <matrix value="0.8329252 0.17467596 0.52509433 -13.091053 -1.3262033e-06 0.9488765 -0.31564766 8.051741 -0.5533857 0.2629102 0.7903433 -19.695524 0 0 0 1"/>
+        </transform>
+    </sensor>
     <!--	Shapes	-->
     <shape type="obj" id="s_FloorPlane">
         <string name="filename" value="models/Cube.001.obj"/>

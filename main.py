@@ -24,7 +24,7 @@ def mitsuba_interactive_window(path, outputFolder):
         my_mi.ptrace_Integrator(scene.object)
     ]
     
-    sys = viewer.render_system(scene, dataset= dataset, integrators= integrators, snapshot = sanpshot)
+    sys = viewer.render_system(scene, dataset, snapshot = sanpshot, integrators= integrators)
     
     start_time = time.time()
     
