@@ -127,6 +127,81 @@ def linear_to_srgb(img):
     else:
         raise TypeError("Input should be a numpy array or a torch tensor")
 
+def rgb_to_hsv(rgb: torch.Tensor) -> torch.Tensor:
+    '''copy from https://github.com/limacv/RGB_HSV_HSL'''
+    cmax, cmax_idx = torch.max(rgb, dim=1, keepdim=True)
+    cmin = torch.min(rgb, dim=1, keepdim=True)[0]
+    delta = cmax - cmin
+    hsv_h = torch.empty_like(rgb[:, 0:1, :, :])
+    cmax_idx[delta == 0] = 3
+    hsv_h[cmax_idx == 0] = (((rgb[:, 1:2] - rgb[:, 2:3]) / delta) % 6)[cmax_idx == 0]
+    hsv_h[cmax_idx == 1] = (((rgb[:, 2:3] - rgb[:, 0:1]) / delta) + 2)[cmax_idx == 1]
+    hsv_h[cmax_idx == 2] = (((rgb[:, 0:1] - rgb[:, 1:2]) / delta) + 4)[cmax_idx == 2]
+    hsv_h[cmax_idx == 3] = 0.
+    hsv_h /= 6.
+    hsv_s = torch.where(cmax == 0, torch.tensor(0.).type_as(rgb), delta / cmax)
+    hsv_v = cmax
+    return torch.cat([hsv_h, hsv_s, hsv_v], dim=1)
+
+
+def hsv_to_rgb(hsv: torch.Tensor) -> torch.Tensor:
+    '''copy from https://github.com/limacv/RGB_HSV_HSL'''
+    hsv_h, hsv_s, hsv_l = hsv[:, 0:1], hsv[:, 1:2], hsv[:, 2:3]
+    _c = hsv_l * hsv_s
+    _x = _c * (- torch.abs(hsv_h * 6. % 2. - 1) + 1.)
+    _m = hsv_l - _c
+    _o = torch.zeros_like(_c)
+    idx = (hsv_h * 6.).type(torch.uint8)
+    idx = (idx % 6).expand(-1, 3, -1, -1)
+    rgb = torch.empty_like(hsv)
+    rgb[idx == 0] = torch.cat([_c, _x, _o], dim=1)[idx == 0]
+    rgb[idx == 1] = torch.cat([_x, _c, _o], dim=1)[idx == 1]
+    rgb[idx == 2] = torch.cat([_o, _c, _x], dim=1)[idx == 2]
+    rgb[idx == 3] = torch.cat([_o, _x, _c], dim=1)[idx == 3]
+    rgb[idx == 4] = torch.cat([_x, _o, _c], dim=1)[idx == 4]
+    rgb[idx == 5] = torch.cat([_c, _o, _x], dim=1)[idx == 5]
+    rgb += _m
+    return rgb
+
+def adjust_brightness_hsv(img:torch.Tensor, lum):
+    # Convert to HSV
+    hsv = rgb_to_hsv(img.permute(2, 0, 1).unsqueeze(0))
+    
+    # Adjust the brightness (value channel)
+    hsv[:, 2] = lum
+    
+    # Convert back to RGB
+    rgb_adjusted = hsv_to_rgb(hsv)
+    
+    return rgb_adjusted[0].permute(1, 2, 0)
+
+def tonemap_photographic(hdr_image, key = 0, adaptive:bool = False):
+    '''
+        key: the key of the image after applying the tone mapping.
+        adaptive: calculate the key of the input image.
+        reference Reinhard, Erik, et al. "Photographic tone reproduction for digital images."
+    "'''
+    alpha = 0.18 * (2 ** key)
+
+    # Ensure the input HDR image is a floating point tensor
+    if hdr_image.dtype != torch.float32 and hdr_image.dtype != torch.float64:
+        raise ValueError("Input HDR image must be a floating point tensor")
+
+    # Calculate luminance (assuming input is in RGB)
+    luminance: torch.Tensor = 0.2126 * hdr_image[:, :, 0] + 0.7152 * hdr_image[:, :, 1] + 0.0722 * hdr_image[:, :, 2]
+
+    Lw = torch.exp(torch.log(luminance + 1e-8).mean()) if adaptive else 0.1
+
+    L = alpha / Lw * luminance
+
+    Lwhite = torch.max(luminance)
+    Ld = L * (1 + L / (Lwhite**2)) / (1 + L)
+
+    tonemapped_image = adjust_brightness_hsv(hdr_image, Ld)
+    tonemapped_image = torch.clamp(tonemapped_image, 0, 1)
+
+    return tonemapped_image
+
 def spherical_to_cartesian(theta, phi):
     '''
     input range:

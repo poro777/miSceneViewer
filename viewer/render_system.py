@@ -194,7 +194,11 @@ class render_system:
                         self.origin, self.angle = self.scene.getCamera(self.var.animation.time)
                     self.view_change = True
                 imgui.tree_pop()
-            
+
+            if imgui.tree_node("Tone mapping"):
+                self.var.tonemap.gui()
+                imgui.tree_pop()
+
             changed, self.var.selected_integrator = radio_button([i.name() for i in self.integrator_list], self.var.selected_integrator)
             if changed:
                 self.progress_image = None
@@ -214,11 +218,13 @@ class render_system:
         gui.render(imgui.get_draw_data())
 
     @measure_execution_time
-    def image_frame(self, image: torch.Tensor, linear_input = True, float_input = True, cudaTensor = True):
+    def image_frame(self, image: torch.Tensor, tone_mapping = True, linear_input = True, float_input = True, cudaTensor = True):
         '''image in tensor (H, W, 3) or (H, W, 4) linear srgb uint8 float'''
         if image.shape[2] == 4:
             image = image[:, :, :3]
-
+        if tone_mapping:
+            image = tonemap_photographic(image, self.var.tonemap.key, self.var.tonemap.adaptive)
+        
         if linear_input:
             image = linear_to_srgb(image)
         if float_input:
@@ -416,7 +422,7 @@ class render_system:
                 self.var.flip.error = self.flip.evaluate(self.render_gt(), to_np(image[:,:,:3]), range)
                 self.var.flip.display = True
 
-            self.image_frame(image)
+            self.image_frame(image, tone_mapping=self.var.tonemap.enable)
 
             
 
@@ -428,7 +434,8 @@ class render_system:
             else:
                 image = self.flip.getErrorMap()
             
-            self.image_frame(torch.tensor(image), linear_input=False, cudaTensor=False)
+            apply_tone_mapping = self.var.flip.selected_type != 0 and self.var.tonemap.enable
+            self.image_frame(torch.tensor(image), tone_mapping=apply_tone_mapping, linear_input=False, cudaTensor=False)
 
         if self.var.once.snapshot_output and self.render_image is not None:
             self.snapshot.write_images(to_np(self.render_image), sys_info)

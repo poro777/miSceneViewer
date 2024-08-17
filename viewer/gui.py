@@ -76,11 +76,25 @@ class Flip:
 
     def gui(self):
         changed, self.display = imgui.checkbox("Show flip", self.display)
-        imgui.text(f"Error: {self.error}")
+        error = round(self.error, 4) if self.error is not None else None
+        imgui.text(f"Error: {error}")
         _, self.selected_range = imgui.combo("Range", self.selected_range, self.range_list)
         _, self.selected_type = radio_button(self.name_list, self.selected_type)
         return changed
-    
+
+
+@dataclass
+class Tonemapping:
+    enable = False
+    key = 0
+    adaptive = False
+
+    def gui(self):
+        _, self.enable = imgui.checkbox("Enable", self.enable)
+        _, self.adaptive = imgui.checkbox("Adaptive input", self.adaptive)
+        _, self.key = imgui.slider_int("Output key", self.key, -5, 5)
+        return False
+
 @dataclass
 class Variable:
     window = Window()
@@ -90,6 +104,7 @@ class Variable:
     animation = Animation()
     progress = Progress()
     flip = Flip()
+    tonemap = Tonemapping()
 
     stop = False
     fps_guard = True
