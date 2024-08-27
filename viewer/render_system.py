@@ -173,6 +173,7 @@ class render_system:
                 if changed:
                     self.scene.setCamera(self.var.selected_scene_sensor)
                     self.origin, self.angle = self.scene.getCamera(self.var.animation.time)
+                    self.view_change = True
                     
                 imgui.tree_pop()
 
@@ -203,7 +204,7 @@ class render_system:
 
             changed, self.var.selected_integrator = radio_button([i.name() for i in self.integrator_list], self.var.selected_integrator)
             if changed:
-                self.progress_image = None
+                self.view_change = True
                 self.change_integrator(self.var.selected_integrator)
 
             self.integrator.gui()
@@ -265,7 +266,7 @@ class render_system:
         if key[pygame.K_r]:
             self.origin, self.angle = self.scene.getCamera(self.var.animation.time)
 
-        if np.any(previous != self.origin):
+        if np.any(previous != self.origin) or key[pygame.K_r]:
             self.view_change = True
     
     def mouse_callback(self, event):
