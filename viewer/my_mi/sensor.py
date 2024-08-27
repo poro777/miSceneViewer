@@ -5,13 +5,16 @@ import torch
 import imgui
 
 class mitsiba_sensor:
-    def __init__(self) -> None:
-        self.object = None
+    def __init__(self, object = None) -> None:
+        self.object = object
+        if self.object is not None:
+            self.params = mi.traverse(self.object)
 
     def gui(self):
         pass
 
     def resize(self, width, height, fov):
+        '''this will create a new object'''
         self.width = width
         self.height = height
         
@@ -33,7 +36,7 @@ class mitsiba_sensor:
         self.params = mi.traverse(self.object)
     
     def setCameraPose(self, to_world):
-        '''set camera pose to to_world matrix. 
+        '''set this camera pose to to_world matrix. 
         - to_woald matrix can get from mitsuba_scene.getCameraMatrix()'''
 
         if self.object is None:

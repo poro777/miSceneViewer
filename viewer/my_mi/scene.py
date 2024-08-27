@@ -24,27 +24,26 @@ class mitsuba_scene:
         
         self.object = mi.load_file(scene_xml)
         self.camera_id = None
-        self.camera_to_world = None
         self.params = mi.traverse(self.object)
 
         self.showCamera = 0
 
         self.time = 0
         self.animation = load_animation(animation_xml) if (animation_xml is not None) else {}
-        self.animated_shape_initial_state = {}
+        self.animated_shape_initial_state = {} # local frame
  
         self.cameras_id:list[str] = [sensor.id() for sensor in self.object.sensors()]
-        self.cameras_to_world = []
+        self.cameras_to_world = {}
 
         unname_id = 0
         for i, camera_id in enumerate(self.cameras_id):
             if '_unnamed' in camera_id:
                 new_camera_id = 'PerspectiveCamera' if unname_id == 0 else f'PerspectiveCamera_{unname_id}'
-                self.cameras_to_world.append(self.params[f'{new_camera_id}.to_world'])
                 unname_id += 1
                 self.cameras_id[i] = new_camera_id
-            else:
-                self.cameras_to_world.append(self.params[f'{camera_id}.to_world'])
+                camera_id = new_camera_id
+
+            self.cameras_to_world[camera_id] = self.params[f'{camera_id}.to_world']
 
         # use first camera
         self.setCamera(0)
@@ -58,13 +57,8 @@ class mitsuba_scene:
                 m0 = mi.cuda_ad_rgb.Transform4f(animation.getMatrix(0.0))
                 self.animated_shape_initial_state[id] = m0.inverse() @ v
             elif f'{id}.to_world' in self.params:     # camera
-                try:
-                    index = self.cameras_id.index(id)
-                except:
-                    print("camera id not found in cameras_id")
-                    continue
                 m0 = mi.cuda_ad_rgb.Transform4f(animation.getMatrix(0.0))
-                cameraMatrix = m0.inverse() @ self.cameras_to_world[index]
+                cameraMatrix = m0.inverse() @ self.cameras_to_world[id]
                 self.animated_shape_initial_state[id] = cameraMatrix
 
         
@@ -92,14 +86,16 @@ class mitsuba_scene:
         if index < 0 or index >= len(self.cameras_id):
             return
         self.camera_id = self.cameras_id[index]
-        self.camera_to_world = self.cameras_to_world[index]
 
-    def getCameraMatrix(self, time):
-        '''return activate camera pose's to_world matrix. This pose will apply animation (if available)'''
-        return camera2matrix(*self.getCamera(time))
+    def getCameraMatrix(self, time, index = None):
+        '''return activated camera pose's to_world matrix. This pose will apply animation (if available)'''
+        return camera2matrix(*self.getCamera(time, index))
         
-    def getCamera(self, time):
-        '''return activate camera pose (position, direction). This pose will apply animation (if available) '''
+    def getCamera(self, time, index = None):
+        '''return activated camera pose (position, direction). This pose will apply animation (if available) '''
+        if index is not None:
+            self.setCamera(index)
+
         if self.camera_id in self.animation:
             animation = self.animation[self.camera_id]
             camera_matrix = self.animated_shape_initial_state[self.camera_id]
@@ -108,10 +104,14 @@ class mitsuba_scene:
         else:
             return self.get_default_camera()
 
-    def get_default_camera(self):
-        '''return activate camera pose (position, direction) without apply animation (t = 0).'''
+    def get_default_camera(self, index = None):
+        '''return activated camera pose (position, direction) without apply animation (t = 0).'''
+        if index is not None:
+            self.setCamera(index)
+
         if self.camera_id is not None:
-            return matrix2camera(self.camera_to_world)
+            toWorld = self.cameras_to_world[self.camera_id]
+            return matrix2camera(toWorld)
         else:
             return np.array([0,0,0], dtype=float), np.array([0, np.pi/2])
     

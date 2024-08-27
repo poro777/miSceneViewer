@@ -22,25 +22,25 @@ class Integrator(ABC):
     def name(self):
         return "Custom"
 
-    def postprocess(self, images, sys_info):
-        '''return torch.tensor'''
+    def postprocess(self, images: Dict[str, torch.Tensor], sys_info: Dict) -> torch.Tensor:
+        '''return torch.tensor, process Integrator.render() output to one image.'''
         raise NotImplementedError
     
-    def render(self):
+    def render(self) -> Dict[str, torch.Tensor]:
         '''return data dict'''
         raise NotImplementedError
     
-    def save_image(self, images):
+    def save_image(self, images: Dict[str, torch.Tensor]):
+        '''return dict[postfix, image | None]'''
         return {
-            "img": None # set None to ues current frame as output image or self.postprocess(images, sys_info)
+            "img": None # set None to ues current frame (may be progress image) as output image
         }
 
     def gui(self):
         pass
-
-    def getOutput(self, SPP, sys_info):
-        '''return torch.tensor'''
-        return self.postprocess(self.render(SPP), sys_info)
+    
+    def getOutput(self, *arg, **kwarg):
+        raise NotImplementedError
 
     
 class mitsuba_Integrator(Integrator):
@@ -54,9 +54,13 @@ class mitsuba_Integrator(Integrator):
             result:mi.TensorXf = mi.render(scene.object, spp=SPP, integrator = self.object, sensor=sensor.object ,seed=np.random.randint(0,999))
             return {"output": result.torch()}
         
-    def postprocess(self, images, sys_info):
+    def postprocess(self, images, sys_info = None):
         return images["output"]
-    
+
+    def getOutput(self, scene:mitsuba_scene, sensor:mitsiba_sensor, SPP, *arg, **kwarg):
+        '''return torch.tensor'''
+        return self.postprocess(self.render(scene, sensor, SPP))
+   
 class path_Integrator(mitsuba_Integrator):
     def __init__(self) -> None:
         super().__init__()
@@ -116,7 +120,7 @@ class path_info_Integrator(mitsuba_Integrator):
             "nor": nor
         }  
     
-    def postprocess(self, images, sys_info):
+    def postprocess(self, images, sys_info = None):
         return images[self.items[self.showItem]]
 
     def gui(self):
