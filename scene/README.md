@@ -3,9 +3,9 @@ Test scene's Blender file can be downloaded from [Google Drive](https://drive.go
 
 Other sample scenes can be found in [Google Drive](https://drive.google.com/drive/folders/1uGSYw2tzQ6esItkB-MoEyVNPbfyCXXQw?usp=sharing).
 
-For some scenes in the link. I recreated the scene in [Rendering resources](https://benedikt-bitterli.me/resources/). 
+
 - Load model to Blender
 - Change materials to Principled BSDF
-- Add lighting
+- Add area light
 - Create animation
 - Export to glTF

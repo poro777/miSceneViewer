@@ -1,10 +1,11 @@
 # Mitsube Scene Viewer and Generator(from blender)
 # Mitsube Scene Viewer
 Simple mitsube viewer in pygame.
-- Integraor parameter control (SPP、depth...)
+- Integraor parameter control (SPP,depth,resolution...)
 - Progress output (average output images)
 - FLIP error map
 - Animation
+- Tone mapping
 - Save image
 
 ![](/images/miViewer.png)
@@ -15,7 +16,7 @@ Install PyTorch(cuda) and packages in requiremetns.txt
 ### Optional
 - [FLIP](https://github.com/NVlabs/flip): Show error map.
 
-- [pycuda](https://github.com/inducer/pycuda): Render the image without copying torch.tensor to host memory. Install pycuda with gl extension.
+- [pycuda](https://github.com/inducer/pycuda): Render the image without copying torch.tensor to host memory. Install pycuda with gl extension.( ! There are bugs after import pycuda)
 1. Clone  `git clone --recursive https://github.com/inducer/pycuda.git `
 2. Create siteconf.py file `python ./configure.py --cuda-enable-gl`
 3. Build `python setup.py build`
@@ -30,6 +31,13 @@ Run the default scene `python ./main.py` or `python ./main.py -p [path to direct
 - `R`: Reset position
 - `Left mouse`: drag to control view direction
 - `Esc`: Quit
+
+## Animation
+Export the animation information to `animation.xml`. (Examples can be found in `scene/miScene`). `animation.xml` can be load through `my_mi.mitsuba_scene`. 
+
+For more information please refer to the function `miWrapper_QuickStart` in `main.py` and `gltf2miScene.cpp`.
+
+
 
 # Mitsube Scene Generator (c++)
 Convert gltf 2.0 to mitsube scene. 
@@ -63,7 +71,7 @@ Some sample scenes can be found [here](./scene/)
 - Run `gltf2miScene.exe path_to_gltf_file.gltf`.
 - The results are located in `miScene/` under the current folder.
 ```
-output
+miScene
 |- textures
     |- texture.png
 |- models
