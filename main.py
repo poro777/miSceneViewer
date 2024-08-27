@@ -19,9 +19,9 @@ def mitsuba_interactive_window(path, outputFolder):
     sanpshot = viewer.Dataset(os.path.join(outputFolder, "snapshot"))
 
     integrators = [
-        my_mi.path_Integrator(scene.object),
-        my_mi.path_info_Integrator(scene.object),
-        my_mi.ptrace_Integrator(scene.object)
+        my_mi.path_Integrator(),
+        my_mi.path_info_Integrator(),
+        my_mi.ptrace_Integrator()
     ]
     
     sys = viewer.render_system(scene, dataset, snapshot = sanpshot, integrators= integrators)

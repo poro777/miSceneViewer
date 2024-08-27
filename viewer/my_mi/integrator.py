@@ -8,6 +8,8 @@ from abc import ABC
 from typing import Dict
 import imgui
 import torch
+from viewer.my_mi.scene import mitsuba_scene
+from viewer.my_mi.sensor import mitsiba_sensor
 
 class Integrator(ABC):
     def __init__(self) -> None:
@@ -24,7 +26,7 @@ class Integrator(ABC):
         '''return torch.tensor'''
         raise NotImplementedError
     
-    def render(self, SPP):
+    def render(self):
         '''return data dict'''
         raise NotImplementedError
     
@@ -36,84 +38,54 @@ class Integrator(ABC):
     def gui(self):
         pass
 
-    def resize(self, width, height, fov):
-        raise NotImplementedError
-
-    def setCameraPose(self, to_world):
-        raise NotImplementedError
-
     def getOutput(self, SPP, sys_info):
         '''return torch.tensor'''
         return self.postprocess(self.render(SPP), sys_info)
 
     
 class mitsuba_Integrator(Integrator):
-    def __init__(self, scene) -> None:
+    def __init__(self) -> None:
         super().__init__()
-        self.scene = scene
-
-    def resize(self, width, height, fov):
-        self.width = width
-        self.height = height
-        
-        self.sensor = mi.load_dict({
-            'type': 'perspective',
-            'fov': fov,
-            'to_world': mi.ScalarTransform4f(),
-            'sampler_id':{
-                'type': 'independent'
-            },
-            'film_id': {
-                'type': 'hdrfilm',
-                'width': self.width,
-                'height': self.height,
-                'pixel_format': 'rgba',
-                "filter": {"type": "box"},
-            }
-        })
-        self.params = mi.traverse(self.sensor)
-
-    def setCameraPose(self, to_world):
-        self.params['to_world'] =  to_world
-        self.params.update()
-    
-    def render(self, SPP):
+    def update(self, depth, *arg, **kwarg):
+        raise NotImplementedError
+      
+    def render(self, scene:mitsuba_scene, sensor:mitsiba_sensor, SPP, *arg, **kwarg):
         with dr.suspend_grad():
-            result:mi.TensorXf = mi.render(self.scene, spp=SPP, integrator = self.object, sensor=self.sensor ,seed=np.random.randint(0,999))
+            result:mi.TensorXf = mi.render(scene.object, spp=SPP, integrator = self.object, sensor=sensor.object ,seed=np.random.randint(0,999))
             return {"output": result.torch()}
         
     def postprocess(self, images, sys_info):
         return images["output"]
     
 class path_Integrator(mitsuba_Integrator):
-    def __init__(self, scene) -> None:
-        super().__init__(scene)
+    def __init__(self) -> None:
+        super().__init__()
     
     def name(self):
         return "Path"
         
-    def update(self, depth):
+    def update(self, depth, *arg, **kwarg):
         self.object =  mi.load_dict({
                 'type': 'path',
                 'max_depth': depth
             })
 
 class ptrace_Integrator(mitsuba_Integrator):
-    def __init__(self, scene) -> None:
-        super().__init__(scene)
+    def __init__(self) -> None:
+        super().__init__()
     
     def name(self):
         return "Ptracer"
         
-    def update(self, depth):
+    def update(self, depth, *arg, **kwarg):
         self.object =  mi.load_dict({
                 'type' : "ptracer",
                 'max_depth': depth
             })
 
 class path_info_Integrator(mitsuba_Integrator):
-    def __init__(self, scene) -> None:
-        super().__init__(scene)
+    def __init__(self) -> None:
+        super().__init__()
         self.itemsName = ["Image", "Position", "Albedo", "Normal"]
         self.items = ["img", "pos", "alb", "nor"]
         self.showItem = 0
@@ -121,7 +93,7 @@ class path_info_Integrator(mitsuba_Integrator):
     def name(self):
         return "PathInfo"
         
-    def update(self, depth):
+    def update(self, depth, *arg, **kwarg):
         self.object =  mi.load_dict({
             'type': 'aov',
             'aovs': 'pos:position,alb:albedo,nor:sh_normal',
@@ -131,8 +103,8 @@ class path_info_Integrator(mitsuba_Integrator):
             }
         })
 
-    def render(self, SPP):
-        images = mitsuba_Integrator.render(self, SPP)["output"]
+    def render(self, scene:mitsuba_scene, sensor:mitsiba_sensor, SPP):
+        images = mitsuba_Integrator.render(self, scene, sensor, SPP)["output"]
         img = images[:,:,0:3]
         pos = images[:,:,4:7]
         alb = images[:,:,7:10]

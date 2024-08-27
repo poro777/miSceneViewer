@@ -4,11 +4,19 @@ import torch
 import numpy as np
 from viewer.animation import *
 import drjit as dr
+from viewer.my_mi.sensor import *
 
 def matrix2camera(toWorld):
         origin = np.array(toWorld @ mi.Point3f(0,0,0))
         direction = np.array(toWorld @ mi.Vector3f(0,0,1))
         return origin[0], cartesian_to_spherical(torch.tensor(direction), "cpu", False)[0].numpy()
+
+def camera2matrix(origin, direciion):
+    def getTarget():
+        sin1 = np.sin(direciion[1])
+        return origin + np.array([sin1 * np.sin(direciion[0] ), np.cos(direciion[1]), sin1 * np.cos(direciion[0] )])
+    
+    return mi.ScalarTransform4f.look_at(origin, getTarget(), np.array([0,1,0.0], dtype=float))
 
 class mitsuba_scene:
     def __init__(self, scene_xml, animation_xml = None) -> None:
@@ -66,9 +74,8 @@ class mitsuba_scene:
         bbox_scale = list(bbox.max - bbox.min)
         return bbox_min, bbox_scale
 
-    
-    
     def setTime(self, time):
+        '''set animated object's pose at time.(camera not included)'''
         for name, animation in self.animation.items():
             if f'{name}.vertex_positions' in self.params:
                 v = self.animated_shape_initial_state[name]
@@ -81,12 +88,18 @@ class mitsuba_scene:
         return self.time
     
     def setCamera(self, index):
+        '''Set current activate camera by index. getCamera() will return corresponding camera pose'''
         if index < 0 or index >= len(self.cameras_id):
             return
         self.camera_id = self.cameras_id[index]
         self.camera_to_world = self.cameras_to_world[index]
 
+    def getCameraMatrix(self, time):
+        '''return activate camera pose's to_world matrix. This pose will apply animation (if available)'''
+        return camera2matrix(*self.getCamera(time))
+        
     def getCamera(self, time):
+        '''return activate camera pose (position, direction). This pose will apply animation (if available) '''
         if self.camera_id in self.animation:
             animation = self.animation[self.camera_id]
             camera_matrix = self.animated_shape_initial_state[self.camera_id]
@@ -96,6 +109,7 @@ class mitsuba_scene:
             return self.get_default_camera()
 
     def get_default_camera(self):
+        '''return activate camera pose (position, direction) without apply animation (t = 0).'''
         if self.camera_id is not None:
             return matrix2camera(self.camera_to_world)
         else:

@@ -26,11 +26,13 @@ from viewer.gui import Variable, radio_button
 class render_system:
     Y = np.array([0,1,0]).astype(float)
     BLACK = torch.zeros((1,1,3)).cuda()
-    def __init__(self, scene: mitsuba_scene, dataset:Dataset, snapshot:Dataset, origin = None, angle = None, var:Variable = None, integrators:List[Integrator] = None) -> None:
+    def __init__(self, scene: mitsuba_scene, dataset:Dataset, snapshot:Dataset, origin = None, angle = None, var:Variable = None, integrators:List[mitsuba_Integrator] = None) -> None:
         self.var = var if var is not None else Variable()
         self.clock = pygame.time.Clock()
 
         self.scene = scene
+        self.sensor = mitsiba_sensor()
+
         self.origin, self.angle = self.scene.get_default_camera()
         if origin is not None:
             self.origin = np.array(origin).astype(float)
@@ -47,7 +49,7 @@ class render_system:
         self.draging = False
         self.progress_image = None
 
-        self.integrator_list : List[Integrator] = []
+        self.integrator_list : List[mitsuba_Integrator] = []
 
         if integrators is not None:
             self.integrator_list += integrators
@@ -67,9 +69,9 @@ class render_system:
     def change_integrator(self, id):
         assert(id < len(self.integrator_list) and id >= 0)
 
-        self.integrator : Integrator = self.integrator_list[id]
+        self.integrator : mitsuba_Integrator = self.integrator_list[id]
         self.integrator.update(self.var.sensor.depth)
-        self.integrator.resize(self.width, self.height, self.var.sensor.fov)
+        self.sensor.resize(self.width, self.height, self.var.sensor.fov)
 
     def getDirection(self):
         angle = self.angle
@@ -87,16 +89,16 @@ class render_system:
     @measure_execution_time
     def render(self, SPP = 32):
         with torch.no_grad():
-            self.to_world = mi.ScalarTransform4f.look_at(self.origin, self.getTarget(), render_system.Y)
-            self.integrator.setCameraPose(self.to_world)
-            return self.integrator.render(SPP)
+            self.to_world = camera2matrix(self.origin, self.angle) # mi.ScalarTransform4f.look_at(self.origin, self.getTarget(), render_system.Y)
+            self.sensor.setCameraPose(self.to_world)
+            return self.integrator.render(self.scene, self.sensor, SPP)
 
     def setResoultion(self):
         '''call when resoultion or window size change'''
         ratio = self.var.window.windowHeight / self.var.window.windowWidth if self.var.window.auto_resize else 1.0
         self.width = min(2 ** self.var.sensor.resoultion, self.var.window.windowWidth)
         self.height = int(self.width * ratio)
-        self.integrator.resize(self.width, self.height, self.var.sensor.fov)
+        self.sensor.resize(self.width, self.height, self.var.sensor.fov)
         self.sample_guard()
         self.view_change = True
 
